@@ -1,0 +1,15 @@
+Traceback (most recent call last):
+  File "C:\Users\FoodLover\Documents\PetProjects\tracking_system\bot.py", line 525, in <module>
+    asyncio.run(main())
+  File "C:\Users\FoodLover\AppData\Local\Programs\Python\Python311\Lib\asyncio\runners.py", line 190, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "C:\Users\FoodLover\AppData\Local\Programs\Python\Python311\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FoodLover\AppData\Local\Programs\Python\Python311\Lib\asyncio\base_events.py", line 650, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "C:\Users\FoodLover\Documents\PetProjects\tracking_system\bot.py", line 314, in main
+    raise RuntimeError("”становите переменную окружени€ BOT_TOKEN с токеном Telegram-бота.")
+RuntimeError: ”становите переменную окружени€ BOT_TOKEN с токеном Telegram-бота.

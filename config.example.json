@@ -1,0 +1,16 @@
+{
+  "report_time": "09:00",
+  "timezone": "Europe/Moscow",
+  "users": {
+    "david": {
+      "id": 111111111,
+      "alias": "D",
+      "name": "Давыд"
+    },
+    "nikita": {
+      "id": 222222222,
+      "alias": "N",
+      "name": "Никита"
+    }
+  }
+}
