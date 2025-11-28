@@ -42,6 +42,7 @@ class UserConfig:
     id: int
     alias: str
     name: str
+    is_admin: bool = False
 
 
 @dataclass
@@ -101,6 +102,7 @@ class TaskRepository:
             id=int(row["id"]),
             alias=str(row["alias"] or "").strip(),
             name=str(row["name"] or "").strip(),
+            is_admin=bool(row["is_admin"]),
         )
 
     async def bootstrap_users_from_config(self, users: Dict[str, UserConfig]) -> None:
@@ -109,9 +111,9 @@ class TaskRepository:
                 self._conn.execute(
                     """
                     INSERT OR IGNORE INTO users (id, alias, name, is_admin)
-                    VALUES (?, ?, ?, 1)
+                    VALUES (?, ?, ?, ?)
                     """,
-                    (user.id, user.alias, user.name),
+                    (user.id, user.alias, user.name, int(user.is_admin)),
                 )
             self._conn.commit()
 
@@ -135,6 +137,13 @@ class TaskRepository:
                 (user_id, alias, name, int(is_admin)),
             )
             self._conn.commit()
+
+    async def remove_user(self, user_id: int) -> bool:
+        async with self._lock:
+            self._conn.execute("UPDATE tasks SET assigned_to = NULL WHERE assigned_to = ?", (user_id,))
+            cursor = self._conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            self._conn.commit()
+            return cursor.rowcount > 0
 
     async def is_allowed(self, user_id: int) -> bool:
         async with self._lock:
@@ -186,6 +195,32 @@ class TaskRepository:
             self._conn.commit()
             return int(cursor.lastrowid) # type: ignore
 
+    async def update_status(self, task_id: int, status: str) -> bool:
+        now = datetime.now(timezone.utc).isoformat()
+        async with self._lock:
+            cursor = self._conn.execute(
+                "UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?",
+                (status, now, task_id),
+            )
+            self._conn.commit()
+            return cursor.rowcount > 0
+
+    async def update_deadline(self, task_id: int, deadline: Optional[str]) -> bool:
+        now = datetime.now(timezone.utc).isoformat()
+        async with self._lock:
+            cursor = self._conn.execute(
+                "UPDATE tasks SET deadline = ?, updated_at = ? WHERE id = ?",
+                (deadline, now, task_id),
+            )
+            self._conn.commit()
+            return cursor.rowcount > 0
+
+    async def delete_task(self, task_id: int) -> bool:
+        async with self._lock:
+            cursor = self._conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+            self._conn.commit()
+            return cursor.rowcount > 0
+
     async def list_by_status(self, status: str) -> list[sqlite3.Row]:
         async with self._lock:
             cursor = self._conn.execute(
@@ -226,26 +261,6 @@ class TaskRepository:
             )
             return cursor.fetchall()
 
-    async def update_status(self, task_id: int, status: str) -> bool:
-        now = datetime.now(timezone.utc).isoformat()
-        async with self._lock:
-            cursor = self._conn.execute(
-                "UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?",
-                (status, now, task_id),
-            )
-            self._conn.commit()
-            return cursor.rowcount > 0
-
-    async def update_deadline(self, task_id: int, deadline: Optional[str]) -> bool:
-        now = datetime.now(timezone.utc).isoformat()
-        async with self._lock:
-            cursor = self._conn.execute(
-                "UPDATE tasks SET deadline = ?, updated_at = ? WHERE id = ?",
-                (deadline, now, task_id),
-            )
-            self._conn.commit()
-            return cursor.rowcount > 0
-
     async def done_since(self, iso_timestamp: str) -> list[sqlite3.Row]:
         async with self._lock:
             cursor = self._conn.execute(
@@ -273,6 +288,7 @@ def load_config(path: str = "config.json") -> BotConfig:
             id=int(value["id"]),
             alias=str(value.get("alias", key)).strip(),
             name=str(value.get("name", key)).strip(),
+            is_admin=bool(value.get("is_admin", False)),
         )
 
     return BotConfig(
@@ -502,7 +518,9 @@ async def main() -> None:
             "• /cancel — отменить ввод задачи\n\n"
             "<b>Админам</b>\n"
             "• /add_user &lt;id&gt; &lt;alias&gt; &lt;Имя&gt;\n"
-            "• /add_admin &lt;id&gt; &lt;alias&gt; &lt;Имя&gt;"
+            "• /add_admin &lt;id&gt; &lt;alias&gt; &lt;Имя&gt;\n"
+            "• /remove_user &lt;id&gt;\n"
+            "• /delete &lt;id&gt; — удалить задачу"
         )
 
     @router.message(Command("help"))
@@ -701,6 +719,47 @@ async def main() -> None:
     @router.message(Command("add_admin"))
     async def cmd_add_admin(message: Message) -> None:
         await handle_add_user_cmd(message, make_admin=True)
+
+    @router.message(Command("remove_user"))
+    async def cmd_remove_user(message: Message) -> None:
+        if not await ensure_admin(message):
+            return
+        parts = message.text.split()  # type: ignore
+        if len(parts) != 2:
+            await message.answer("Использование: /remove_user <id>")
+            return
+        try:
+            user_id = int(parts[1])
+        except ValueError:
+            await message.answer("id должен быть числом.")
+            return
+
+        removed = await repo.remove_user(user_id)
+        await refresh_users_cache()
+        if removed:
+            await message.answer(f"Пользователь {user_id} удалён и потеряет доступ.")
+        else:
+            await message.answer("Пользователь не найден.")
+
+    @router.message(Command("delete"))
+    async def cmd_delete(message: Message) -> None:
+        if not await ensure_admin(message):
+            return
+        parts = message.text.split()  # type: ignore
+        if len(parts) != 2:
+            await message.answer("Использование: /delete <id>")
+            return
+        try:
+            task_id = int(parts[1])
+        except ValueError:
+            await message.answer("id должен быть числом.")
+            return
+
+        deleted = await repo.delete_task(task_id)
+        if deleted:
+            await message.answer(f"Задача #{task_id} удалена.")
+        else:
+            await message.answer("Задача не найдена.")
 
     @router.message(Command("deadline"))
     async def cmd_deadline(message: Message) -> None:

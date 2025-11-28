@@ -3,20 +3,23 @@
   "evening_report_time": "19:00",
   "timezone": "Europe/Moscow",
   "users": {
-    "davud": {
+    "davyd": {
       "id": 884110873,
       "alias": "D",
-      "name": "Давыд"
+      "name": "Давыд",
+      "is_admin": true
     },
     "nikita": {
       "id": 964474646,
       "alias": "N",
-      "name": "Никита"
+      "name": "Никита",
+      "is_admin": true
     },
     "tasya": {
       "id": 648018562,
       "alias": "T",
-      "name": "Тася"
+      "name": "Тася",
+      "is_admin": false
     }
   }
 }

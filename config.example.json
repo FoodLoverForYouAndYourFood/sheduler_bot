@@ -3,20 +3,23 @@
   "evening_report_time": "19:00",
   "timezone": "Europe/Moscow",
   "users": {
-    "david": {
+    "owner": {
       "id": 111111111,
-      "alias": "D",
-      "name": "Давид"
+      "alias": "O",
+      "name": "Админ Один",
+      "is_admin": true
     },
-    "nikita": {
+    "admin_two": {
       "id": 222222222,
-      "alias": "N",
-      "name": "Никита"
+      "alias": "A",
+      "name": "Админ Два",
+      "is_admin": true
     },
-    "tasya": {
+    "user_example": {
       "id": 333333333,
-      "alias": "T",
-      "name": "Тася"
+      "alias": "U",
+      "name": "Пользователь",
+      "is_admin": false
     }
   }
 }
